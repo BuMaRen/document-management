@@ -1,6 +1,8 @@
 baseURL = "https://example.org/"
 languageCode = "en-us"
-title = "Healing"
+title = "masha-note"
 theme = "lightbi-hugo"
+
+[Params]
 homepageLayout = "blog"
 previewCardImagePlacement = "bottom"

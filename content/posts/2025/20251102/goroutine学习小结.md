@@ -3,6 +3,7 @@ title: "goroutine学习小结"
 date: 2025-11-02T00:08:02+08:00
 tags: ["go", "goroutine"]
 Description: "goroutine学习小结"
+image: "/img/posts/2025/20251102/goroutine.png"
 ---
 
 # goroutine学习小结

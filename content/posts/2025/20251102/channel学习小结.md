@@ -3,7 +3,7 @@ title: "Channel学习小结"
 date: 2025-11-02T14:33:47+08:00
 tags: ["go", "channel"]
 Description: "Channel学习小结"
-image: "Channel学习小结封面.png"
+image: "/img/posts/2025/20251102/channel.png"
 ---
 
 # Channel学习小结

@@ -52,7 +52,7 @@ jobs:
         run: hugo new site document-management --force
       - name: Config pages
         run: |
-          rm -rf document-management/content document-management/hugo.toml
+          rm -rf document-management/content document-management/assets document-management/hugo.toml
           mv document-management/* .
           git submodule add https://github.com/binokochumolvarghese/lightbi-hugo themes/lightbi-hugo
           rm -rf document-management

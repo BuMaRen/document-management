@@ -3,7 +3,7 @@ title: "Waitgroup"
 date: 2025-11-03T23:15:44+08:00
 description : "WaitGroup小结"
 tags: ["go", "WaitGroup"]
-image : "/img/posts/2025/20251103/waitgroup.jpg"
+image : "/img/posts/2025/20251103/waitgroup.png"
 ---
 
 # WaitGroup

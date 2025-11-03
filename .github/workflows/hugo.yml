@@ -55,7 +55,7 @@ jobs:
           rm -rf document-management/content document-management/assets
           mv document-management/* .
           git submodule add https://github.com/binokochumolvarghese/lightbi-hugo themes/lightbi-hugo
-          echo -e "baseURL = \"https://example.org/\"\nlanguageCode = \"en-us\"\ntitle = \"BuMaRen-Note\"\ntheme = \"lightbi-hugo\"\n[Params]\nhomepageLayout = \"blog\"\npreviewCardImagePlacement = \"bottom\"" > hugo.toml
+          echo -e "baseURL = \"https://example.org/\"\nlanguageCode = \"en-us\"\ntitle = \"BuMaRen-Note\"\ntheme = \"lightbi-hugo\"\n[Params]\nhomepageLayout = \"blog\"\npreviewCardImagePlacement = \"bottom\"\nshowRelatedPosts = true" > hugo.toml
           rm -rf document-management
       - name: Build with Hugo
         env:

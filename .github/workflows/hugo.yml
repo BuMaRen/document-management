@@ -52,11 +52,11 @@ jobs:
         run: hugo new site document-management --force
       - name: Config pages
         run: |
-          rm -rf document-management/content document-management/assets document-management/hugo.toml
+          rm -rf document-management/content document-management/assets
           mv document-management/* .
           git submodule add https://github.com/binokochumolvarghese/lightbi-hugo themes/lightbi-hugo
+          echo -e "baseURL = \"https://example.org/\"\nlanguageCode = \"en-us\"\ntitle = \"BuMaRen-Note\"\ntheme = \"lightbi-hugo\"\n[Params]\nhomepageLayout = \"blog\"\npreviewCardImagePlacement = \"bottom\"" > hugo.toml
           rm -rf document-management
-      
       - name: Build with Hugo
         env:
           HUGO_CACHEDIR: ${{ runner.temp }}/hugo_cache

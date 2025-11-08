@@ -48,7 +48,7 @@ type Context interface {
 
 `Value` 允许 `Context` 携带请求范围的数据。该数据必须多个 goroutine 间的并发安全。
 
-## 衍生的 Context
+### 衍生的 Context
 
 context 包提供了杂已有 `Context` 上衍生新的 `Context` 的方法。当父 `Context` 被取消的时候，所有衍生的 `Context` 也会被取消。所有的 `Context` 均衍生自 `Background`， `Background` 永远不会被取消：
 
@@ -57,3 +57,30 @@ context 包提供了杂已有 `Context` 上衍生新的 `Context` 的方法。�
 // Background 通常用在 main, init, tests 和一些需要顶级 Context 的场合。
 func Background() Context
 ```
+
+`WithCancel` 和 `WithTimeout` 返回可以在父 `Context` 之前取消的衍生 `Context`。每个请求的 `Context` 一般在请求结束后就被取消了。
+
+```Golang
+// WithCancel 返回 parent 的副本
+// 这个副本的 Done 返回的 channel 在 cancel 被调用或者 parent 被取消的时候关闭
+func WithCancel(parent Context) (ctx Context, cancel CancelFunc)
+
+// A CancelFunc cancels a Context.
+type CancelFunc func()
+
+// WithTimeout 返回 parent 的副本，与 WithCancel 的差别在于该副本在超时的时候 Done 返回的 channel 也会被关闭。
+// 衍生 Context 的截止时间为 min(当前时间+timeout, parent的截止时间)
+// 如果超时之前调用了 cancel, 资源会被回收
+func WithTimeout(parent Context, timeout time.Duration) (Context, CancelFunc)
+```
+
+`WithValue` 提供了将值关联到 `Context` 上的途径：
+
+```Golang
+// WithValue 返回 parent 的副本，副本中保存了 key-val 的键制对。
+func WithValue(parent Context, key interface{}, val interface{}) Context
+```
+
+了解如何使用 context 包的最佳方法是通过一个实际示例。
+
+## 示例：Google 网页搜索

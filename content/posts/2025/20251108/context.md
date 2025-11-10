@@ -84,3 +84,199 @@ func WithValue(parent Context, key interface{}, val interface{}) Context
 了解如何使用 context 包的最佳方法是通过一个实际示例。
 
 ## 示例：Google 网页搜索
+
+这个示例是一个 HTTP 服务器，它通过将 `golang` 转发到 [Google Web Search API](https://developers.google.com/custom-search) 并呈现结果来处理类似 `/search?q=golang&timeout=1s` 的 URL。
+
+代码分为三部分：
+* [server](https://go.dev/blog/context/server/server.go) 包含了 `main` 和 `/search` 的处理逻辑。
+* [userip](https://go.dev/blog/context/userip/userip.go) 包含了从 `Context` 红解析相关参数的逻辑。
+* [google](https://go.dev/blog/context/google/google.go) 提供了查询 Google 的 `Search` 函数。
+
+### server
+
+server 处理类似 `/search?q=golang` 的请求，并提供 Google 搜索 golang 的前几个结果。`handleSearch` 被注册用于处理 `/search` 的请求。`handleSearch` 创建一个名为 ctx 的初始 `Context`，并安排在处理完成返回时取消。如果请求包含超时的参数，则超时后 `Context` 将自动取消：
+
+```Golang
+func handleSearch(w http.ResponseWriter, req *http.Request) {
+    // ctx 是这个处理流程的 Context。 
+    // cancel 用于关闭 ctx.Done 返回的 channel。
+    var (
+        ctx    context.Context
+        cancel context.CancelFunc
+    )
+    timeout, err := time.ParseDuration(req.FormValue("timeout"))
+    if err == nil {
+        // 创建一个超时自动 cancel 的 Context。
+        ctx, cancel = context.WithTimeout(context.Background(), timeout)
+    } else {
+        ctx, cancel = context.WithCancel(context.Background())
+    }
+    defer cancel() // 流程结束后取消根 Context。
+```
+
+通过 userip 包提取请求中包含的客户端的 IP 地址。由于后续的流程也会用到，所以将改变量添加到 `Context` 中：
+
+```Golang
+    query := req.FormValue("q")
+    if query == "" {
+        http.Error(w, "no query", http.StatusBadRequest)
+        return
+    }
+
+    // 将 userip 添加到 Context 中
+    userIP, err := userip.FromRequest(req)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+    ctx = userip.NewContext(ctx, userIP)
+```
+
+调用 `google.Search` 进行查询：
+
+```Golang
+    start := time.Now()
+    results, err := google.Search(ctx, query)
+    elapsed := time.Since(start)
+```
+
+搜索成功时会呈现结果：
+
+```Golang
+    if err := resultsTemplate.Execute(w, struct {
+        Results          google.Results
+        Timeout, Elapsed time.Duration
+    }{
+        Results: results,
+        Timeout: timeout,
+        Elapsed: elapsed,
+    }); err != nil {
+        log.Print(err)
+        return
+    }
+```
+
+### userip
+
+userip 包提供了从请求中 IP 地址并将其与 `Context` 关联的函数。`Context` 提供 k-v 映射，其中 key 和 value 均为 `interface{}` 类型。 key 必须支持相等性，并且 value 必须能够安全地供多个 `goroutine` 同时使用。像 userip 这样的包隐藏了这种 k-v 的细节，并提供了对特定 `Context` 值的强类型访问。为避免 key 冲突，userip 定义了一个未导出的类型 `key`，并使用该类型的值作为 `Context` 的 key：
+
+```Golang
+// key 类型不导出，防止冲突
+type key int
+
+// userIPkey 是 userIP 地址的在 Context 中的 key。
+// 它的值为零是任意的。如果此 package 定义了其他的 Context 的 key，则它们将具有不同的整数值。
+const userIPKey key = 0
+```
+
+`FromRequest` 从 `http.Request` 中提取 userIP:
+
+```Golang
+func FromRequest(req *http.Request) (net.IP, error) {
+    ip, _, err := net.SplitHostPort(req.RemoteAddr)
+    if err != nil {
+        return nil, fmt.Errorf("userip: %q is not IP:port", req.RemoteAddr)
+    }
+```
+
+`NewContext` 返回一个新的 `Context`，其中包含提供的 userIP：
+
+```Golang
+func NewContext(ctx context.Context, userIP net.IP) context.Context {
+    return context.WithValue(ctx, userIPKey, userIP)
+}
+```
+
+FromContext 从 `Context` 中提取 userIP:
+
+```Golang
+func FromContext(ctx context.Context) (net.IP, bool) {
+    // 如果 ctx 没有 k-v，则 ctx.Value 返回 nil;
+    // net.IP 类型断言对 nil 返回 ok=false.
+    userIP, ok := ctx.Value(userIPKey).(net.IP)
+    return userIP, ok
+}
+```
+
+### google
+
+`google.Search` 函数向 [Google Web Search API](https://developers.google.com/custom-search) 发出 HTTP 请求，并解析 JSON 编码的结果。它接受一个 `Context` 参数 ctx，如果在请求进行中时 `ctx.Done` 关闭，则立即返回:
+
+```Golang
+func Search(ctx context.Context, query string) (Results, error) {
+    // 准备 Google Web Search API 请求。
+    req, err := http.NewRequest("GET", "https://ajax.googleapis.com/ajax/services/search/web?v=1.0", nil)
+    if err != nil {
+        return nil, err
+    }
+    q := req.URL.Query()
+    q.Set("q", query)
+
+    // 如果 ctx 包含 user IP，则将其转发到 server。
+    // Google API 使用 user IP 来区分服务器发起的请求和最终用户的请求。
+    if userIP, ok := userip.FromContext(ctx); ok {
+        q.Set("userip", userIP.String())
+    }
+    req.URL.RawQuery = q.Encode()
+```
+
+`Search` 使用辅助函数 `httpDo` 来发出 HTTP 请求。在请求或响应处理过程中如果 `ctx.Done` 关闭则取消请求。`Search` 将一个闭包传递给 `httpDo` 来处理 HTTP 响应：
+
+```Golang
+    var results Results
+    err = httpDo(ctx, req, func(resp *http.Response, err error) error {
+        if err != nil {
+            return err
+        }
+        defer resp.Body.Close()
+
+        // 解析 json 搜索结果.
+        // https://developers.google.com/web-search/docs/#fonje
+        var data struct {
+            ResponseData struct {
+                Results []struct {
+                    TitleNoFormatting string
+                    URL               string
+                }
+            }
+        }
+        if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+            return err
+        }
+        for _, res := range data.ResponseData.Results {
+            results = append(results, Result{Title: res.TitleNoFormatting, URL: res.URL})
+        }
+        return nil
+    })
+    // httpDo 会等待我们提供的闭包返回，因此可以安全地在此处读取结果。
+    return results, err
+```
+
+`httpDo` 函数会在一个新的 `goroutine` 中运行 HTTP 请求并处理其响应。如果 `ctx.Done` 在 `goroutine` 退出之前关闭，则会取消该请求：
+
+```Golang
+func httpDo(ctx context.Context, req *http.Request, f func(*http.Response, error) error) error {
+    // Run the HTTP request in a goroutine and pass the response to f.
+    c := make(chan error, 1)
+    req = req.WithContext(ctx)
+    go func() { c <- f(http.DefaultClient.Do(req)) }()
+    select {
+    case <-ctx.Done():
+        <-c // Wait for f to return.
+        return ctx.Err()
+    case err := <-c:
+        return err
+    }
+}
+```
+
+## 调整 Context 代码
+
+许多服务器框架都提供了用于承载请求范围值的包和类型。我们可以定义 `Context` 接口的新实现，使现有代码可以在新框架下运行。
+
+例如，`Gorilla` 的 `github.com/gorilla/context` 包允许处理程序通过提供从 `HTTP 请求`到`键值对`的映射，将数据与传入的请求关联起来。在 `gorilla.go` 中，我们提供了一个 `Context` 实现，其 `Value` 方法的返回与 `Gorilla` 包中特定 HTTP 请求相关联。
+
+其他的包也提供了类似于 `Context` 的取消方法。比如 [Tomb](https://godoc.org/gopkg.in/tomb.v2) 提供了 `Kill` 函数通过关闭一个 `Dying` 的 channel 来表示取消。`Tomb` 还提供了一些方法等待 `goroutine` 的退出，比如说 `sync.WaitGroup`。在 [tomb.go](https://go.dev/blog/context/tomb/tomb.go) 中提供了一个 `Context` 实现，当其父 `Context` 被取消或提供的 `Tomb` 被销毁时，该 `Context` 实现也会被取消。
+
+## 结束语
+

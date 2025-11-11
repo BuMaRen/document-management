@@ -9,7 +9,8 @@ image : "/img/posts/2025/20251108/Context.png"
 # Go语言并发模式：Context
 
 *Sameer Ajmani*  
-*29 July 2014*
+*29 July 2014*  
+*原文地址：https://go.dev/blog/context*
 
 ## 介绍
 
@@ -270,7 +271,7 @@ func httpDo(ctx context.Context, req *http.Request, f func(*http.Response, error
 }
 ```
 
-## 调整 Context 代码
+## Context 的适配
 
 许多服务器框架都提供了用于承载请求范围值的包和类型。我们可以定义 `Context` 接口的新实现，使现有代码可以在新框架下运行。
 
@@ -280,3 +281,6 @@ func httpDo(ctx context.Context, req *http.Request, f func(*http.Response, error
 
 ## 结束语
 
+Google 要求 Go 程序员将 `Context` 作为入参和返回值的第一位。这使得不同团队开发的 Go 代码能够很好地配合。它提供了对超时和取消操作的简单控制，并确保安全凭证等关键值能够正确地在 Go 程序中传递。
+
+基于 ``Context`` 构建服务的框架应该提供相应的 `Context` 实现以便于哪些依赖 `Context` 的包使用。Client 从调用者的代码接收 `Context` 对象。通过为请求范围的数据和取消操作建立通用接口，`Context` 使包开发者能够更轻松地共享代码，从而创建可扩展的服务。

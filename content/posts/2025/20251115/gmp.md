@@ -1,7 +1,6 @@
 ---
 title: "Gmp"
 date: 2025-11-15T23:32:28+08:00
-draft: true
 description : "Go语言的GMP模型（摘自Go源码）"
 tags: ["go", "goroutine", "thread", "processor", "scheduler"]
 image : "/img/posts/2025/20251115/gmp.jpg"
@@ -42,5 +41,5 @@ Go 调度器的作用就是将已经准备好运行的 goroutine 分发给工作
 
 当 G 准备就绪的时候，唤醒 M 并将 G 分发给它执行。这会导致以下几个问题：
 1. Thread state thrashing（线程状态抖动）
-    
+
 1. 
